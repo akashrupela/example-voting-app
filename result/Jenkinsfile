@@ -1,33 +1,61 @@
 pipeline{
     agent any
 
-    tools{
-        nodejs 'NodeJS 8.9.0'
-    }
-
     stages{
-        stage('build'){
+        stage("build"){
+            agent {
+              docker{
+                image 'node:8.16-alpine'
+              }
+            }
             when{
-                changeset "**/result/**"
+              changeset "**/result/**"
             }
             steps{
-                echo 'Building nodeJS'
-                dir('result'){
-                    sh 'npm install'
+                echo "Building result app..."
+                dir("result"){
+                  sh 'npm install'
                 }
             }
         }
-        stage('test'){
+        stage("test"){
+            agent {
+              docker{
+                image 'node:8.16-alpine'
+              }
+            }
             when{
-                changeset "**/result/**"
+              changeset "**/result/**"
             }
             steps{
-                echo 'Testing nodeJS'
-                dir('result'){
-                    sh 'npm test'
+                echo "Testing result app..."
+                dir("result"){
+                  sh 'npm test'
                 }
             }
+        }
+        stage('docker-package'){
+          agent any
+          when{
+             changeset "**/result/**"
+          }
+          steps{
+            echo 'Packaging result app with docker'
+            script{
+              docker.withRegistry('https://index.docker.io/v1/', 'dockerlogin') {
+                 def resultImage = docker.build("akashrupela/result:v${env.BUILD_ID}", "./result")
+                 resultImage.push()
+                 resultImage.push("latest")
+              }
+           }
+       }
+    }
+  }
+
+    post{
+        always{
+            echo "This pipeline run is completed.."
         }
     }
-
 }
+
